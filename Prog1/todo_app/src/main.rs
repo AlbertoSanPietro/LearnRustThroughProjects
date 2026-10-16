@@ -106,21 +106,57 @@ impl TodoList {
     }
 }
 
-fn main() {
-    let cli = Cli::parse();
+fn run_command(cli: Cli) -> Result<(), TodoError> {
+    let mut todo_list =
+        TodoList::load_from_file("tasks.json").map_err(|e| TodoError::FileError(e.to_string()))?;
 
     match cli.command {
         Commands::Add { task } => {
-            println!("Adding task {}", task);
-        }
-        Commands::List => {
-            println!("Lisiting all tasks");
-        }
-        Commands::Remove { id } => {
-            println!("Removing task: {}", id);
+            todo_list.add_task(task)?;
+            println!("Task added succesfully");
         }
         Commands::Complete { id } => {
-            println!("Completed task: {}", id);
+            todo_list.complete_task(id)?;
+            println!("Task {} marked as complete", id);
         }
+        _ => {}
+    }
+
+    todo_list
+        .save_to_file("tasks.json")
+        .map_err(|e| TodoError::FileError(e.to_string()))?;
+
+    Ok(())
+}
+
+fn main() {
+    let cli = Cli::parse();
+
+    if let Err(e) = run_command(cli) {
+        eprintln!("Error: {}", e);
+        std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::Path;
+
+    #[test]
+    fn test_add_task() {
+        let mut todo_list = TodoList::new();
+        let res = todo_list.add_task("Test task".to_string());
+        assert!(res.is_ok());
+        assert_eq!(todo_list.task.len(), 1);
+        assert_eq!(todo_list.task[0].description, "Test task");
+    }
+
+    #[test]
+    fn test_empty_task() {
+        let mut todo_list = TodoList::new();
+        let res = todo_list.add_task(" ".to_string());
+        assert!(res.is_err());
     }
 }
